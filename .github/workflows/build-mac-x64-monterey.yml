@@ -1,0 +1,87 @@
+name: Build Desktop · macOS x64 (Monterey)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [macos12-electron43]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-mac-x64-monterey
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ${{ vars.MONTEREY_RUNNER || 'macos-15-intel' }}
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v5.0.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - name: Host info
+        run: sw_vers; uname -m; node -v; pnpm -v; xcodebuild -version || true; python3 --version
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check packaging configuration and toolchain
+        run: pnpm run package:desktop:mac:x64:unsigned --check
+      - name: Build unsigned x64 installers
+        run: pnpm run package:desktop:mac:x64:unsigned
+      - name: List artifacts
+        if: always()
+        run: find apps/desktop/.desktop-build/targets/mac-x64 -maxdepth 3 \( -name '*.dmg' -o -name '*.zip' -o -name '*.app' \) -print -exec ls -ld {} \; || true
+      - name: Scan Mach-O minimum macOS versions
+        id: scan
+        run: |
+          set -euo pipefail
+          root=apps/desktop/.desktop-build/targets/mac-x64
+          dmg=$(find "$root" -name '*.dmg' -print | head -1)
+          test -n "$dmg" || { echo "::error::no DMG produced"; exit 1; }
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          app=$(find "$mnt" -maxdepth 1 -name '*.app' | head -1)
+          echo "DMG: $dmg"; shasum -a 256 "$dmg"; ls -l "$dmg"
+          echo "LSMinimumSystemVersion: $(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist")"
+          for fw in "$app/Contents/Frameworks"/*.framework; do
+            p="$fw/Resources/Info.plist"; [ -f "$p" ] && echo "$(basename "$fw"): $(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$p" 2>/dev/null || echo n/a)"
+          done
+          LIMIT=12.0 VERBOSE=1 python3 .github/monterey/macho_minos.py "$app" | tee scan.txt
+          # Archives shipped inside Resources (runtime payloads) are scanned too.
+          find "$app/Contents/Resources" -type f \( -name '*.tar.gz' -o -name '*.tgz' -o -name '*.tar.xz' \) -print0 | xargs -0 -r env LIMIT=12.0 python3 .github/monterey/macho_minos.py | tee -a scan.txt
+          echo "---- binaries above 12.0 or non-x86_64 ----"
+          grep '^BAD ' scan.txt | tee bad.txt || true
+          while IFS= read -r l; do echo "::warning::$l"; done < bad.txt
+          core=$(grep -E "^BAD $app/Contents/(MacOS|Frameworks)/" bad.txt || true)
+          hdiutil detach "$mnt" || true
+          if [ -n "$core" ]; then echo "::error::core app/Electron binaries exceed macOS 12.0"; echo "$core"; exit 1; fi
+          mkdir -p scan-out; cp scan.txt bad.txt scan-out/
+      - name: Upload unsigned DMG
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dsh-desktop-mac-x64-monterey-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/desktop/.desktop-build/targets/mac-x64/**/*.dmg
+            scan-out/
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload packaging diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: packaging-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: apps/desktop/.desktop-build/packaging-runs/
+          if-no-files-found: warn
+          retention-days: 7
