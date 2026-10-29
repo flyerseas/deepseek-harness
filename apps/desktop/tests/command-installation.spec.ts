@@ -49,7 +49,7 @@ async function fixture() {
 describe.skipIf(process.platform === 'win32')('macOS command entry ownership', () => {
   beforeAll(async () => {
     compiled = await mkdtemp(join(tmpdir(), 'dsh-command-control-'))
-    if (process.platform === 'darwin') prepareCommandLink(compiled, process.arch === 'arm64' ? 'arm64' : 'x64', '13.0')
+    if (process.platform === 'darwin') prepareCommandLink(compiled, process.arch === 'arm64' ? 'arm64' : 'x64', '12.0')
   })
   afterAll(async () => { if (compiled !== undefined) await rm(compiled, { recursive: true, force: true }) })
   it('installs and removes only its own link', async () => {

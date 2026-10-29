@@ -81,6 +81,18 @@ export async function downloadRuntimeNpmPackage(artifact: RuntimeNpmArchive, des
 }
 
 /**
+ * Resolve the standalone Node release for one target.
+ * Intel macOS pins Node 22 LTS: official Node 24 darwin-x64 binaries require macOS 13.5, while Desktop supports macOS 12.
+ * @param target - Locked runtime target.
+ * @param runtimeLock - Locked interpreter inputs.
+ * @returns The target's Node version, defaulting to the lock-wide version.
+ */
+export function primaryRuntimeNodeVersion(target: PrimaryRuntimeTarget, runtimeLock: typeof lock = lock): string {
+  const artifact = runtimeLock.targets[target]
+  return 'nodeVersion' in artifact && typeof artifact.nodeVersion === 'string' ? artifact.nodeVersion : runtimeLock.nodeVersion
+}
+
+/**
  * Prepare the locked standalone Node independently of Python and pnpm.
  * @param target - Target interpreter platform.
  * @param destination - Directory receiving bin/node and LICENSE.
@@ -89,8 +101,9 @@ export async function downloadRuntimeNpmPackage(artifact: RuntimeNpmArchive, des
  */
 export async function downloadNodeRuntime(target: PrimaryRuntimeTarget, destination: string, cache: string): Promise<void> {
   const artifact = lock.targets[target]
-  const filename = `node-v${lock.nodeVersion}-${artifact.nodeArchive}`
-  const archive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${lock.nodeVersion}/${filename}`, artifact.nodeSha256, cache)
+  const nodeVersion = primaryRuntimeNodeVersion(target)
+  const filename = `node-v${nodeVersion}-${artifact.nodeArchive}`
+  const archive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${nodeVersion}/${filename}`, artifact.nodeSha256, cache)
   const staging = mkdtempSync(join(tmpdir(), 'dsh-node-'))
   try {
     if (target === 'win-x64') await extractZip(archive, { dir: staging })
@@ -121,7 +134,8 @@ async function pythonArchive(target: keyof typeof lock.targets, cache: string): 
 export function primaryRuntimePayloadDigest(
   target: keyof typeof lock.targets, runtimeLock: typeof lock, pnpmVersion: string | undefined,
 ): string {
-  const { pythonVersion, pythonRelease, nodeVersion, wheels, pythonPackages } = runtimeLock
+  const { pythonVersion, pythonRelease, wheels, pythonPackages } = runtimeLock
+  const nodeVersion = primaryRuntimeNodeVersion(target, runtimeLock)
   // Identity preserves key order within the selected target, wheel records and distribution map, plus wheel-entry order.
   // Bump format when extraction or assembly changes payload bytes without changing locked inputs.
   return createHash('sha256').update(JSON.stringify({
@@ -217,7 +231,7 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
       arch: target.endsWith('-arm64') ? 'arm64' : 'x64',
       payloadDigest: primaryRuntimePayloadDigest(target, lock, pnpmVersion),
       python: lock.pythonVersion,
-      ...(pnpmVersion === undefined ? {} : { node: lock.nodeVersion, pnpm: pnpmVersion }),
+      ...(pnpmVersion === undefined ? {} : { node: primaryRuntimeNodeVersion(target), pnpm: pnpmVersion }),
       pythonPackages: lock.pythonPackages,
     }
     const entries = workspaceDependencyPaths(output, manifest)

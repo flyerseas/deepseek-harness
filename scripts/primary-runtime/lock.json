@@ -52,8 +52,9 @@
       ]
     },
     "mac-x64": {
+      "nodeVersion": "22.23.4",
       "nodeArchive": "darwin-x64.tar.gz",
-      "nodeSha256": "1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097",
+      "nodeSha256": "efcc2b0db6f94bf53eddb038fe2b370277a042bd29e4f19b8f8e23598795b819",
       "pythonTarget": "x86_64-apple-darwin",
       "pythonSha256": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb",
       "wheels": [
