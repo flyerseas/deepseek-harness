@@ -106,9 +106,9 @@ minimumReleaseAgeExclude:
   # must be exempt from the release-age window that guards other packages.
   - pnpm@11.28.5
   # Electron 43 is the last major that runs on macOS 12 Monterey (Electron 44 requires macOS 13).
-  # node-addon-require-builtin 0.1.9 does not recognize this exact Node/V8 fingerprint; Desktop's
-  # Host runs with --expose-internals, so the Loader takes its direct require path instead.
-  - electron@43.8.4
+  # Pinned to 43.0.0: node-addon-require-builtin 0.1.9 only recognizes the 43.0.0 Node/V8 fingerprint,
+  # and the packaging smoke test exercises it directly.
+  - electron@43.0.0
 patchedDependencies:
   '@botiverse/oar@0.67.0': patches/@botiverse__oar@0.67.0.patch
   '@earendil-works/pi-ai@1.3.0': patches/@earendil-works__pi-ai@1.3.0.patch
