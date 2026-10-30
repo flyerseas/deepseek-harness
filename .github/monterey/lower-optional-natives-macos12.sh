@@ -29,10 +29,14 @@ if command -v vtool >/dev/null 2>&1; then
     [ -n "$f" ] || continue
     sdk=$(vtool -show-build "$f" 2>/dev/null | awk '/sdk/{print $2; exit}') || sdk=15.0
     sdk=${sdk:-15.0}
-    echo "vtool -set-build-version macos ${TARGET_MINOS} ${sdk} -replace $f"
-    vtool -set-build-version macos "$TARGET_MINOS" "$sdk" -replace "$f" || {
+    tmp="${f}.vtool-out"
+    echo "vtool -set-build-version macos ${TARGET_MINOS} ${sdk} -replace -o $tmp $f"
+    if vtool -set-build-version macos "$TARGET_MINOS" "$sdk" -replace -o "$tmp" "$f"; then
+      mv -f "$tmp" "$f"
+    else
+      rm -f "$tmp"
       echo "vtool failed on $f; python rewrite already applied"
-    }
+    fi
   done <"$list"
 fi
 

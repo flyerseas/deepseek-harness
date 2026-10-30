@@ -42,6 +42,11 @@ jobs:
         run: pnpm run package:desktop:mac:x64:unsigned --check
       - name: Build unsigned x64 installers
         run: pnpm run package:desktop:mac:x64:unsigned
+      # prepare-dsh reinstalls into a fresh temp tree, so node_modules patches above
+      # do not reach the final app. Re-extract the DMG, inject the rebuilt
+      # require-builtin + lower sherpa minos, then rewrite the DMG.
+      - name: Patch natives inside packaged DMG
+        run: bash .github/monterey/repack-dmg-macos12.sh
       - name: List artifacts
         if: always()
         run: find apps/desktop/.desktop-build/targets/mac-x64 -maxdepth 3 \( -name '*.dmg' -o -name '*.zip' -o -name '*.app' \) -print -exec ls -ld {} \; || true

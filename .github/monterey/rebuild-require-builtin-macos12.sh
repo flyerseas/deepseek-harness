@@ -54,6 +54,11 @@ if VERBOSE=1 LIMIT="$TARGET_MINOS" python3 "$ROOT/.github/monterey/macho_minos.p
   exit 1
 fi
 
+OUT_DIR="$ROOT/.github/monterey/out"
+mkdir -p "$OUT_DIR"
+cp -f "$OUT" "$OUT_DIR/darwin-x64-napi-v9.node"
+echo "saved $OUT_DIR/darwin-x64-napi-v9.node"
+
 echo "==> Replacing prebuilts under $ROOT/node_modules"
 while IFS= read -r -d '' dest; do
   echo "replace $dest"
