@@ -21,8 +21,10 @@ if [ ! -s "$list" ]; then
 fi
 
 echo "Lowering minos to ${TARGET_MINOS} on $(wc -l < "$list" | tr -d ' ') file(s)"
-# shellcheck disable=SC2046
-python3 "$SCRIPT" "$TARGET_MINOS" $(cat "$list")
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  python3 "$SCRIPT" "$TARGET_MINOS" "$f"
+done <"$list"
 
 if command -v vtool >/dev/null 2>&1; then
   while IFS= read -r f; do
@@ -40,6 +42,8 @@ if command -v vtool >/dev/null 2>&1; then
   done <"$list"
 fi
 
-# shellcheck disable=SC2046
-VERBOSE=1 LIMIT="$TARGET_MINOS" python3 "$ROOT/.github/monterey/macho_minos.py" $(cat "$list")
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  VERBOSE=1 LIMIT="$TARGET_MINOS" python3 "$ROOT/.github/monterey/macho_minos.py" "$f"
+done <"$list"
 rm -f "$list"

@@ -14,6 +14,7 @@ if [ ! -d "$UNPACKED" ]; then
 fi
 
 # Prefer the CI-rebuilt require-builtin binary when present.
+# Paths may contain spaces (e.g. "DeepSeek Harness.app"); never word-split them.
 while IFS= read -r dest; do
   [ -n "$dest" ] || continue
   if [ -f "$REBUILT" ]; then
@@ -25,14 +26,16 @@ while IFS= read -r dest; do
   fi
 done < <(find "$UNPACKED" -type f -name 'darwin-x64-napi-v9.node' -print)
 
-# Lower minos on require-builtin (safety) and sherpa-onnx.
+# Lower minos on require-builtin (safety) and sherpa-onnx — one path per python invoke.
 list=$(mktemp)
 find "$UNPACKED" -type f \( -name 'darwin-x64-napi-v9.node' -o -name 'sherpa-onnx.node' \) >"$list"
 if [ -s "$list" ]; then
   echo "lowering minos on $(wc -l < "$list" | tr -d ' ') file(s) in app"
-  # shellcheck disable=SC2046
-  python3 "$ROOT/.github/monterey/lower_macho_minos.py" "$TARGET_MINOS" $(cat "$list")
-  VERBOSE=1 LIMIT="$TARGET_MINOS" python3 "$ROOT/.github/monterey/macho_minos.py" $(cat "$list")
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    python3 "$ROOT/.github/monterey/lower_macho_minos.py" "$TARGET_MINOS" "$f"
+    VERBOSE=1 LIMIT="$TARGET_MINOS" python3 "$ROOT/.github/monterey/macho_minos.py" "$f"
+  done <"$list"
 fi
 rm -f "$list"
 
