@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [macos12-electron43]
+    paths-ignore:
+      - '.github/workflows/**'
 
 permissions:
   contents: write
@@ -78,8 +80,10 @@ jobs:
           gh release create "$tag" "${dmgs[@]}" --target "${{ github.sha }}" \
             --title "DeepSeek Harness · macOS 12 Monterey · Intel x64 (#${{ github.run_number }})" \
             --notes "Built from the official deepseek-ai/deepseek-harness fork with Electron 43.0.0 on the free GitHub-hosted macos-15-intel standard runner. Unsigned/ad-hoc signed DMG for Intel Macs running macOS 12.x. No paid runner, no Apple Developer certificate, no notarization."
-          echo "RELEASE_URL=$(gh release view "$tag" --json url -q .url)" >> "$GITHUB_ENV"
-          echo "Download the DMG from $RELEASE_URL"
+          release_url=$(gh release view "$tag" --json url -q .url)
+          echo "RELEASE_URL=$release_url" >> "$GITHUB_ENV"
+          echo "DMG published: $release_url" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download the DMG from $release_url"
       - name: Upload packaging diagnostics
         if: failure()
         uses: actions/upload-artifact@v7.0.1
