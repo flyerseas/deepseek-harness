@@ -6,7 +6,7 @@ on:
     branches: [macos12-electron43]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: build-mac-x64-monterey
@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   package:
-    runs-on: ${{ vars.MONTEREY_RUNNER || 'macos-15-intel' }}
+    # Public repositories use GitHub-hosted standard runners free and unlimited.
+    # macos-15-intel is the free Intel (x86_64) standard runner; macos-13 was retired on 2025-12-04.
+    runs-on: macos-15-intel
     timeout-minutes: 240
     defaults:
       run:
@@ -22,6 +24,7 @@ jobs:
     env:
       DSH_TELEMETRY_DISABLED: '1'
       TARGET_MINOS: '12.0'
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -64,6 +67,19 @@ jobs:
           compression-level: 0
           if-no-files-found: warn
           retention-days: 14
+      - name: Publish DMG as a public release
+        if: success()
+        run: |
+          set -euo pipefail
+          dmgs=()
+          while IFS= read -r file; do dmgs+=("$file"); done < <(find apps/desktop/.desktop-build/targets/mac-x64 -type f -name '*.dmg' | sort)
+          if [ "${#dmgs[@]}" -eq 0 ]; then echo '::error::No unsigned x64 DMG was produced'; exit 1; fi
+          tag="monterey-x64-${{ github.run_number }}"
+          gh release create "$tag" "${dmgs[@]}" --target "${{ github.sha }}" \
+            --title "DeepSeek Harness · macOS 12 Monterey · Intel x64 (#${{ github.run_number }})" \
+            --notes "Built from the official deepseek-ai/deepseek-harness fork with Electron 43.0.0 on the free GitHub-hosted macos-15-intel standard runner. Unsigned/ad-hoc signed DMG for Intel Macs running macOS 12.x. No paid runner, no Apple Developer certificate, no notarization."
+          echo "RELEASE_URL=$(gh release view "$tag" --json url -q .url)" >> "$GITHUB_ENV"
+          echo "Download the DMG from $RELEASE_URL"
       - name: Upload packaging diagnostics
         if: failure()
         uses: actions/upload-artifact@v7.0.1
